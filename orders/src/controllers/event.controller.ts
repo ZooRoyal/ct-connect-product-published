@@ -1,10 +1,13 @@
 import { Request, Response } from 'express';
 import CustomError from '../errors/custom.error';
 import { logger } from '../utils/logger.utils';
-import { Message, OrderCreatedMessage } from '@commercetools/platform-sdk';
+import {
+  Message,
+  Product,
+  ProductPublishedMessage,
+} from '@commercetools/platform-sdk';
 import axios from 'axios';
 import { readEndpointConfiguration } from '../utils/config.utils';
-import { createApiRoot } from '../client/create.client';
 
 const EXPANDS = [
   'lineItems[*].productType',
@@ -44,62 +47,9 @@ export const post = async (request: Request, response: Response) => {
     if (decodedData) {
       const message: Message | undefined = JSON.parse(decodedData);
 
-      if (message && message.type === 'OrderCreated') {
-        const orderCreateMessage = message as OrderCreatedMessage;
-        let order = orderCreateMessage.order;
-        if (orderCreateMessage.order.id) {
-          const result = await createApiRoot()
-            .orders()
-            .withId({ ID: orderCreateMessage.order.id })
-            .get({
-              queryArgs: {
-                expand: EXPANDS,
-              },
-            })
-            .execute()
-            .then(({ body }) => {
-              if (!body.orderNumber) {
-                return createApiRoot()
-                  .orders()
-                  .withId({ ID: orderCreateMessage.order.id })
-                  .post({
-                    queryArgs: {
-                      expand: EXPANDS,
-                    },
-                    body: {
-                      version: body.version,
-                      actions: [
-                        {
-                          action: 'setOrderNumber',
-                          orderNumber: 'vnde' + Date.now(),
-                        },
-                      ],
-                    },
-                  })
-                  .execute()
-                  .then((order) => {
-                    return order.body;
-                  });
-              } else {
-                return body;
-              }
-            });
-          if (result) {
-            order = result;
-          }
-        }
-        const result = await axios.post(
-          `${endpointConfig.endpoint}`,
-          { ...message, order: order },
-          {
-            auth: {
-              username: endpointConfig.endpointUsername,
-              password: endpointConfig.endpointPassword,
-            },
-          }
-        );
-        response.status(result.status).send();
-        return;
+      if (message && message.type === 'ProductPublished') {
+        const productPublishedMessage = message as ProductPublishedMessage;
+        logger.info('ProductPublishedMessage', productPublishedMessage);
       }
     }
 
